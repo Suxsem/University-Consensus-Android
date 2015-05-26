@@ -17,7 +17,10 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.WindowManager;
 import android.widget.TextView;
+
+import java.util.Arrays;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -44,7 +47,6 @@ public class MainActivity extends ActionBarActivity {
     public final static String my_label = "c";
     private final static String[] in_label = {"a", "d"};
     private float[] data = new float[in_n];
-    private boolean[] online = new boolean[in_n];
     private float state = 0;
     private float currentTemp = -274;
 
@@ -59,12 +61,10 @@ public class MainActivity extends ActionBarActivity {
                 String sender = topic.substring(last_slash_pos + 1);
                 for (int i = 0; i < in_n; i++) {
                     if (in_label[i].equals(sender)) {
-                        data[i] = Float.parseFloat(message);
-                        if (data[i] > -274 && !online[i]) {
-                            online[i] = true;
+                        float newData = Float.parseFloat(message);
+                        if (data[i] == -274 && newData > -274) {
                             in_n_online++;
-                        } else if (data[i] == -274 && online[i]) {
-                            online[i] = false;
+                        } else if (data[i] > -274 && newData == 274) {
                             in_n_online--;
                         }
                     }
@@ -84,10 +84,13 @@ public class MainActivity extends ActionBarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         stateView = (TextView) findViewById(R.id.state);
         iterView = (TextView) findViewById(R.id.iteration);
         onlineView = (TextView) findViewById(R.id.test);
+
+        Arrays.fill(data, -274);
 
         registerReceiver(tempReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 
@@ -145,7 +148,7 @@ public class MainActivity extends ActionBarActivity {
                     float old_state = state;
                     state = 0;
                     for (int i = 0; i < in_n; i++) {
-                        if (online[i])
+                        if (data[i] > -274)
                             state = state + weight * data[i];
                     }
                     state = state + weight * old_state;
@@ -204,13 +207,13 @@ public class MainActivity extends ActionBarActivity {
         @Override
         public void onServiceConnected(ComponentName arg0, IBinder binder) {
             service = new Messenger(binder);
-            Bundle data = new Bundle();
-            //data.putSerializable(MqttService.CLASSNAME, MainActivity.class);
-            data.putCharSequence(MqttService.INTENTNAME, MESSAGE);
-            data.putCharSequence(MqttService.CONNECTEDNAME, CONENCTED);
-            data.putCharSequence(MqttService.DISCONNECTEDNAME, DISCONNECTED);
+            Bundle bundle = new Bundle();
+            //bundle.putSerializable(MqttService.CLASSNAME, MainActivity.class);
+            bundle.putCharSequence(MqttService.INTENTNAME, MESSAGE);
+            bundle.putCharSequence(MqttService.CONNECTEDNAME, CONENCTED);
+            bundle.putCharSequence(MqttService.DISCONNECTEDNAME, DISCONNECTED);
             Message msg = Message.obtain(null, MqttService.REGISTER);
-            msg.setData(data);
+            msg.setData(bundle);
             msg.replyTo = serviceHandler;
             try {
                 service.send(msg);
@@ -225,15 +228,15 @@ public class MainActivity extends ActionBarActivity {
     };
 
     private void subscribe(boolean subscribe) {
-        Bundle data;
+        Bundle bundle;
         Message msg;
         try {
             for (int i = 0; i < in_label.length; i++) {
-                data = new Bundle();
-                data.putCharSequence(MqttService.TOPIC, "test/distributed/" + in_label[i]);
-                data.putInt(MqttService.QOS, 2);
+                bundle = new Bundle();
+                bundle.putCharSequence(MqttService.TOPIC, "test/distributed/" + in_label[i]);
+                bundle.putInt(MqttService.QOS, 2);
                 msg = Message.obtain(null, subscribe ? MqttService.SUBSCRIBE : MqttService.UNSUBSCRIBE);
-                msg.setData(data);
+                msg.setData(bundle);
                 service.send(msg);
             }
         } catch (RemoteException e) {
