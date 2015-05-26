@@ -42,10 +42,11 @@ public class MainActivity extends ActionBarActivity {
 
 
     //consensus variables node c
-    private final static int in_n = 2;
-    private int in_n_online = 0;
     public final static String my_label = "c";
     private final static String[] in_label = {"a", "d"};
+
+    private static int in_n = 0;
+    private int in_n_online = 0;
     private float[] data = new float[in_n];
     private float state = 0;
     private float currentTemp = -274;
@@ -91,6 +92,7 @@ public class MainActivity extends ActionBarActivity {
         onlineView = (TextView) findViewById(R.id.test);
 
         Arrays.fill(data, -274);
+        in_n = in_label.length;
 
         registerReceiver(tempReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
 
