@@ -318,7 +318,7 @@ public class MqttService extends Service {
             private MemoryPersistence persistence = new MemoryPersistence();
 
             MsgHandler() {
-                options.setWill("test/distributed/" + MainActivity.my_label, "-274".getBytes(), 2, true);
+                options.setWill(MainActivity.my_label + "_s", "F".getBytes(), 2, true);
                 options.setCleanSession(true);
                 options.setKeepAliveInterval(240);
 
