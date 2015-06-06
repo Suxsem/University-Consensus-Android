@@ -43,14 +43,14 @@ public class MainActivity extends ActionBarActivity {
 
     //consensus variables node c
 
-    public final static String my_label = "c";
-    private final static int in_n = 2;
-    private final static String[] in_label = {"a", "d"};
-    private float[] data = new float[in_n];
-    private String[] sync = new String[in_n];
+    public final static String my_label = "d";
+    private final static String[] in_label = {"c","e"};
+    private int in_n;
+    private float[] data;
+    private String[] sync;
     private float state;
     private float input;
-    private int currentTemp;
+    private float currentTemp;
 
     public class PushReceiver extends BroadcastReceiver {
         @Override
@@ -91,8 +91,6 @@ public class MainActivity extends ActionBarActivity {
         iterView = (TextView) findViewById(R.id.iteration);
         onlineView = (TextView) findViewById(R.id.test);
 
-        registerReceiver(tempReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-
         intentFilter = new IntentFilter();
         intentFilter.addAction(MESSAGE);
         intentFilter.addAction(CONENCTED);
@@ -111,50 +109,23 @@ public class MainActivity extends ActionBarActivity {
 
             try {
 
+                while (connected < 1)
+                    if (Thread.interrupted())
+                        throw new InterruptedException();
+
+                in_n = in_label.length;
+                data = new float[in_n];
+                sync = new String[in_n];
                 Arrays.fill(sync, "F");
                 input = currentTemp;
                 state = input;
 
-                Bundle bundle = new Bundle();
-                bundle.putCharSequence(MqttService.TOPIC, my_label + "_s");
-                bundle.putCharSequence(MqttService.MESSAGE, "B");
-                bundle.putInt(MqttService.QOS, 2);
-                bundle.putBoolean(MqttService.RETAIN, true);
-                Message msg = Message.obtain(null, MqttService.PUBLISH);
-                msg.setData(bundle);
-                try {
-                    service.send(msg);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
+                publish(my_label + "_s", "B");
 
                 Thread.sleep(10000);
 
-                bundle = new Bundle();
-                bundle.putCharSequence(MqttService.TOPIC, my_label + "_d");
-                bundle.putCharSequence(MqttService.MESSAGE, String.valueOf(state));
-                bundle.putInt(MqttService.QOS, 2);
-                bundle.putBoolean(MqttService.RETAIN, true);
-                msg = Message.obtain(null, MqttService.PUBLISH);
-                msg.setData(bundle);
-                try {
-                    service.send(msg);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
-
-                bundle = new Bundle();
-                bundle.putCharSequence(MqttService.TOPIC, my_label + "_s");
-                bundle.putCharSequence(MqttService.MESSAGE, "R");
-                bundle.putInt(MqttService.QOS, 2);
-                bundle.putBoolean(MqttService.RETAIN, true);
-                msg = Message.obtain(null, MqttService.PUBLISH);
-                msg.setData(bundle);
-                try {
-                    service.send(msg);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
+                publish(my_label + "_d", String.valueOf(state));
+                publish(my_label + "_s", "R");
 
                 while(true) {
 
@@ -179,31 +150,8 @@ public class MainActivity extends ActionBarActivity {
                     state = newState + newInput - input;
                     input = newInput;
 
-                    bundle = new Bundle();
-                    bundle.putCharSequence(MqttService.TOPIC, my_label + "_d");
-                    bundle.putCharSequence(MqttService.MESSAGE, String.valueOf(state));
-                    bundle.putInt(MqttService.QOS, 2);
-                    bundle.putBoolean(MqttService.RETAIN, true);
-                    msg = Message.obtain(null, MqttService.PUBLISH);
-                    msg.setData(bundle);
-                    try {
-                        service.send(msg);
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
-
-                    bundle = new Bundle();
-                    bundle.putCharSequence(MqttService.TOPIC, my_label + "_s");
-                    bundle.putCharSequence(MqttService.MESSAGE, "R");
-                    bundle.putInt(MqttService.QOS, 2);
-                    bundle.putBoolean(MqttService.RETAIN, true);
-                    msg = Message.obtain(null, MqttService.PUBLISH);
-                    msg.setData(bundle);
-                    try {
-                        service.send(msg);
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
+                    publish(my_label + "_d", String.valueOf(state));
+                    publish(my_label + "_s", "R");
 
                     for (int i = 0; i < in_n; i++) {
                         if (sync[i].equals("R"))
@@ -211,6 +159,7 @@ public class MainActivity extends ActionBarActivity {
                     }
 
                     skip++;
+
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -220,11 +169,11 @@ public class MainActivity extends ActionBarActivity {
                         }
                     });
 
-                    while (true) {
-                        for (int i = 0; i < in_n; i++) {
-                            if (sync[i].equals("B"))
-                                i = -1;
-                        }
+                    Thread.sleep(500);
+
+                    for (int i = 0; i < in_n; i++) {
+                        if (sync[i].equals("B"))
+                            i = -1;
                     }
 
                 }
@@ -239,6 +188,7 @@ public class MainActivity extends ActionBarActivity {
         super.onStart();
         startService(new Intent(this, MqttService.class));
         bindService(new Intent(this, MqttService.class), serviceConnection, 0);
+        registerReceiver(tempReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         registerReceiver(pushReceiver, intentFilter);
         consensusThread = new ConsensusThread();
         consensusThread.start();
@@ -249,23 +199,15 @@ public class MainActivity extends ActionBarActivity {
         super.onStop();
         if (consensusThread != null)
             consensusThread.interrupt();
-        Bundle bundle = new Bundle();
-        bundle.putCharSequence(MqttService.TOPIC, my_label + "_s");
-        bundle.putCharSequence(MqttService.MESSAGE, "F");
-        bundle.putInt(MqttService.QOS, 2);
-        bundle.putBoolean(MqttService.RETAIN, true);
-        Message msg = Message.obtain(null, MqttService.PUBLISH);
-        msg.setData(bundle);
-        try {
-            service.send(msg);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
+
+        publish(my_label + "_s", "F");
 
         subscribe(false);
         connected = -1;
+        unregisterReceiver(tempReceiver);
         unregisterReceiver(pushReceiver);
         unbindService(serviceConnection);
+        finish();
     }
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
@@ -317,6 +259,21 @@ public class MainActivity extends ActionBarActivity {
         }
     }
 
+    private void publish(String topic, String message) {
+        Bundle bundle = new Bundle();
+        bundle.putCharSequence(MqttService.TOPIC, topic);
+        bundle.putCharSequence(MqttService.MESSAGE, message);
+        bundle.putInt(MqttService.QOS, 2);
+        bundle.putBoolean(MqttService.RETAIN, true);
+        Message msg = Message.obtain(null, MqttService.PUBLISH);
+        msg.setData(bundle);
+        try {
+            service.send(msg);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
     class ServiceHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
@@ -338,7 +295,7 @@ public class MainActivity extends ActionBarActivity {
     private BroadcastReceiver tempReceiver = new BroadcastReceiver(){
         @Override
         public void onReceive(Context arg0, Intent intent) {
-            currentTemp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0);
+            currentTemp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10f;
         }
     };
 

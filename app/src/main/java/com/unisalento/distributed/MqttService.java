@@ -320,7 +320,7 @@ public class MqttService extends Service {
             MsgHandler() {
                 options.setWill(MainActivity.my_label + "_s", "F".getBytes(), 2, true);
                 options.setCleanSession(true);
-                options.setKeepAliveInterval(240);
+                options.setKeepAliveInterval(30);
 
                 try {
                     X509TrustManager stupidTruster = new X509TrustManager() {
@@ -354,16 +354,17 @@ public class MqttService extends Service {
 
             private void setConnectionInfo() {
                 try {
-                    final String user = "test";
-                    final String password = "test";
-                    final String host = "suxsem.dlinkddns.com";
-                    final String port = "8883";
+                    final String user = "";
+                    final String password = "";
+                    final String host = "192.168.10.1";
+                    final String port = "1883";
 
                     options.setUserName(user.length() > 0 ? user : "null");
                     options.setPassword(password.length() > 0 ? password.toCharArray() : "null".toCharArray());
-                    String uri;
-                        uri = "ssl://" + (host.length() > 0 ? host : "127.0.0.1") + ":" + (port.length() > 0 ? port : "8883");
-                        options.setSocketFactory(socketFactory);
+
+                    String uri = "tcp://" + (host.length() > 0 ? host : "127.0.0.1") + ":" + (port.length() > 0 ? port : "1883");
+                    options.setSocketFactory(null);
+
                     client = new MqttClientPing(uri, MqttClient.generateClientId(), persistence, new MqttPingSender(service));
                     client.setCallback(this);
                 } catch (MqttException e) {
